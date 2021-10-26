@@ -1,56 +1,57 @@
 package main
 
 import (
-        "crypto/sha256"
-        "encoding/hex"
-        "encoding/json"
-        "fmt"
-        "io"
-        "log"
-        "net/http"
-        "os"
-        "strconv"
-        "strings"
-        "sync"
-        "time"
-
-        "github.com/davecgh/go-spew/spew"
-        "github.com/gorilla/mux"
-        "github.com/joho/godotenv"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
+import "github.com/davecgh/go-spew/spew"
+import "github.com/gorilla/mux"
+import "github.com/joho/godotenv"
+
 const difficulty = 1
 
 type Block struct {
-        Index      int
-        Timestamp  string
-        BPM        int
-        Hash       string
-        PrevHash   string
-        Difficulty int
-        Nonce      string
+	Index      int
+	Timestamp  string
+	BPM        int
+	Hash       string
+	PrevHash   string
+	Difficulty int
+	Nonce      string
 }
 
 var Blockchain []Block
 
 type Message struct {
-        BPM int
+	BPM int
 }
 
 var mutex = &sync.Mutex{}
+
 func run() error {
 	mux := makeMuxRouter()
 	httpAddr := os.Getenv("ADDR")
 	log.Println("Listening on ", os.Getenv("ADDR"))
 	s := &http.Server{
-			Addr:           ":" + httpAddr,
-			Handler:        mux,
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20,
+		Addr:           ":" + httpAddr,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
 	}
 
 	if err := s.ListenAndServe(); err != nil {
-			return err
+		return err
 	}
 
 	return nil
@@ -65,8 +66,8 @@ func makeMuxRouter() http.Handler {
 func handleGetBlockchain(w http.ResponseWriter, r *http.Request) {
 	bytes, err := json.MarshalIndent(Blockchain, "", "  ")
 	if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	io.WriteString(w, string(bytes))
 }
@@ -75,9 +76,9 @@ func respondWithJSON(w http.ResponseWriter, r *http.Request, code int, payload i
 	w.Header().Set("Content-Type", "application/json")
 	response, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("HTTP 500: Internal Server Error"))
-			return
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("HTTP 500: Internal Server Error"))
+		return
 	}
 	w.WriteHeader(code)
 	w.Write(response)
@@ -88,9 +89,9 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&m); err != nil {
-			respondWithJSON(w, r, http.StatusBadRequest, r.Body)
-			return
-	}   
+		respondWithJSON(w, r, http.StatusBadRequest, r.Body)
+		return
+	}
 	defer r.Body.Close()
 
 	//ensure atomicity when creating new block
@@ -99,24 +100,24 @@ func handleWriteBlock(w http.ResponseWriter, r *http.Request) {
 	mutex.Unlock()
 
 	if isBlockValid(newBlock, Blockchain[len(Blockchain)-1]) {
-			Blockchain = append(Blockchain, newBlock)
-			spew.Dump(Blockchain)
-	}   
+		Blockchain = append(Blockchain, newBlock)
+		spew.Dump(Blockchain)
+	}
 
 	respondWithJSON(w, r, http.StatusCreated, newBlock)
 
 }
 func isBlockValid(newBlock, oldBlock Block) bool {
 	if oldBlock.Index+1 != newBlock.Index {
-			return false
+		return false
 	}
 
 	if oldBlock.Hash != newBlock.PrevHash {
-			return false
+		return false
 	}
 
 	if calculateHash(newBlock) != newBlock.Hash {
-			return false
+		return false
 	}
 
 	return true
@@ -145,17 +146,17 @@ func generateBlock(oldBlock Block, BPM int) Block {
 	newBlock.Difficulty = difficulty
 
 	for i := 0; ; i++ {
-			hex := fmt.Sprintf("%x", i)
-			newBlock.Nonce = hex
-			if !isHashValid(calculateHash(newBlock), newBlock.Difficulty) {
-					fmt.Println(calculateHash(newBlock), " do more work!")
-					time.Sleep(time.Second)
-					continue
-			} else {
-					fmt.Println(calculateHash(newBlock), " work done!")
-					newBlock.Hash = calculateHash(newBlock)
-					break
-			}
+		hex := fmt.Sprintf("%x", i)
+		newBlock.Nonce = hex
+		if !isHashValid(calculateHash(newBlock), newBlock.Difficulty) {
+			fmt.Println(calculateHash(newBlock), " do more work!")
+			time.Sleep(time.Second)
+			continue
+		} else {
+			fmt.Println(calculateHash(newBlock), " work done!")
+			newBlock.Hash = calculateHash(newBlock)
+			break
+		}
 
 	}
 	return newBlock
@@ -163,19 +164,19 @@ func generateBlock(oldBlock Block, BPM int) Block {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-			log.Fatal(err)
-	}   
+		log.Fatal(err)
+	}
 
 	go func() {
-			t := time.Now()
-			genesisBlock := Block{}
-			genesisBlock = Block{0, t.String(), 0, calculateHash(genesisBlock), "", difficulty, ""} 
-			spew.Dump(genesisBlock)
+		t := time.Now()
+		genesisBlock := Block{}
+		genesisBlock = Block{0, t.String(), 0, calculateHash(genesisBlock), "", difficulty, ""}
+		spew.Dump(genesisBlock)
 
-			mutex.Lock()
-			Blockchain = append(Blockchain, genesisBlock)
-			mutex.Unlock()
-	}() 
+		mutex.Lock()
+		Blockchain = append(Blockchain, genesisBlock)
+		mutex.Unlock()
+	}()
 	log.Fatal(run())
 
 }
